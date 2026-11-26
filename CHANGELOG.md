@@ -10,6 +10,8 @@ Each change goes under **Unreleased** as it's made; `scripts/release.sh` turns t
 
 - `twee-tools = "x.y.z"` in `twee.toml` pins the twee-tools a project builds with: any other version downloads that
   one once, checks it, and runs it in its place.
+- npm packages: `npm install --save-dev @ifloom/twee-tools` for a Node project, with each system's build in its own
+  package.
 - `upgrade` recognises a copy installed with npm, and says to upgrade it with npm.
 
 ### Changed

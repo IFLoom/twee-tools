@@ -89,8 +89,9 @@ moves it). Pins start at 0.1.1, the first version that knows the key.
   builds are static, so they run on any distribution.
 - **With Rust installed:** `cargo install --git https://github.com/IFLoom/twee-tools twee-tools` builds and installs
   it from the repository, or, in a checkout, `cargo install --path crates/cli`.
-- **npm** (planned, if asked for): `npm i -D twee-tools`, one binary per platform as esbuild ships, for JavaScript
-  projects that want the version in their lock file.
+- **npm,** for a project that already uses Node: `npm install --save-dev @ifloom/twee-tools`, then `npx twee-tools
+  build` or a script in `package.json`. The version is in the lock file, and npm installs only your system's build,
+  from its own package (`@ifloom/twee-tools-linux-x64` and so on), as esbuild does.
 
 Both scripts download the release for your system and check it against the release's checksums before installing.
 `TWEE_TOOLS_VERSION=0.2.0` installs one particular version, newer or older.
@@ -406,6 +407,9 @@ cargo fmt                                  # rustfmt.toml: 160 columns
 - **Updating a built-in format:** replace its folder in `crates/build/formats/`. For Harlowe, then run
   `python3 scripts/harlowe-macros.py` to regenerate its macro table; for Chapbook, update the patterns in
   `crates/check/src/chapbook.rs`. A test fails until the two agree.
+- **npm:** `scripts/npm-packages.py` makes the npm packages from a release's archives: `npm/twee-tools` is the
+  main one's launcher and README. The release workflow tries them on each system and publishes them after the GitHub
+  release, given an `NPM_TOKEN` secret.
 - **Releasing:** add each change to `CHANGELOG.md`'s Unreleased section as it's made. `scripts/release.sh 0.2.0`
   sets the version, closes that section, runs the tests, commits and tags; pushing the tag
   (`git push origin main v0.2.0`) runs `.github/workflows/release.yml`, which builds the five binaries, tries the
