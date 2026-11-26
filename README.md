@@ -9,8 +9,8 @@ A Twee compiler, story checker and media compressor for [Twine](https://twinery.
 - **Build** Twee into a page to play, as [Tweego](https://www.motoslave.net/tweego/) does, with SugarCube, Harlowe,
   Chapbook and Snowman built in, so there's nothing else to install.
 - **Check** the whole story every time you build: broken links, passages nothing reaches, dead ends, misspelt macros
-  and variables, JavaScript that doesn't parse, missing media, each with its file and line. Errors stop the build
-  before a player meets them.
+  and variables, JavaScript that doesn't parse, missing media, each with its file and line. If there are errors, it
+  doesn't build.
 - **Shrink** a story's images to WebP for release, and rewrite the story to point at them.
 
 It checks published pages too, so it works for stories made in the Twine editor as well as Twee projects.
