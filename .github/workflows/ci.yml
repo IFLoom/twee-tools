@@ -1,0 +1,61 @@
+# Every push to main and every pull request: the format check, then clippy and the tests on Linux, macOS and Windows.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Warnings fail the build, as `cargo clippy -- -D warnings` does locally.
+  RUSTFLAGS: -D warnings
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      # Extwee's and twee-ts's test stories, at the commits the tests were written against. The tests that read them
+      # skip themselves without them, so this runs on one system only.
+      - name: Clone the external fixtures
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          clone() {
+            git init -q "fixtures/external/$1"
+            git -C "fixtures/external/$1" fetch -q --depth 1 "$2" "$3"
+            git -C "fixtures/external/$1" checkout -q FETCH_HEAD
+          }
+          clone extwee https://github.com/videlais/extwee c215cc0b9da94f2728d5a7492d00a175209678b3
+          clone twee-ts https://github.com/rohal12/twee-ts 67984a1f56813c89a9a8fa0905a851eea366e408
+
+      - run: cargo clippy --all-targets
+      - run: cargo test
