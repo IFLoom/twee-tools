@@ -53,8 +53,9 @@ $ twee-tools build --check-only
 ## Installing
 
 twee-tools is one program with nothing else to install, so install it once, globally, as you would Tweego. Each project
-pins what changes a built page, its story format (`format = "SugarCube@2.37.3"` in `twee.toml`, which `init` writes for
-you), so a newer twee-tools still builds the same page.
+names the story format it's written for (`format = "SugarCube@2.37.3"` in `twee.toml`, which `init` writes for you),
+and `twee-tools formats vendor` keeps that exact version in the project, so a newer twee-tools still builds the same
+page.
 
 - **Prebuilt binaries** for Linux, macOS and Windows will be on the
   [releases page](https://github.com/IFLoom/twee-tools/releases), with a one-line install script, from the first
@@ -99,7 +100,8 @@ twee-tools decompile story.html --split src/     # a published story back to Twe
 | `check <page>` | Check a published `.html` story, or a folder holding one. |
 | `compress <story> --out <dir>` | Write a copy of a published story with its images re-encoded as WebP. |
 | `decompile <page>` | Turn a published story (or a Twine archive) back into Twee: one file, or `--split` into many. |
-| `formats [list \| path \| licenses]` | The story formats: built in, and installed where Tweego looks. |
+| `formats [list \| path \| licenses]` | The story formats: built in, installed where Tweego looks, and the project's own. |
+| `formats vendor [format]` | Copy a story format into the project's `formats/`, so its builds keep that exact version. |
 
 Every command takes `-C <dir>` to run as if started in another folder, and `twee-tools <command> --help` lists the
 rest of its options.
@@ -131,7 +133,8 @@ build writes can be checked too: `twee-tools check dist/index.html` finds what t
 
 - **Story formats** need no setup: SugarCube 2.37.3, Harlowe 3.3.9, Chapbook 2.3.1 and Snowman 2.1.4 are built in.
   Others are found where Tweego looks (`storyformats`, `.storyformats` or `story-formats` beside the program, in your
-  home folder or the working folder, then `TWEEGO_PATH`), and a project's own `format-paths` win over all of them. The
+  home folder or the working folder, then `TWEEGO_PATH`), and a project's own (its `formats/` folder, or
+  `format-paths`) win over all of them; `twee-tools formats vendor` copies a format there. The
   format is the one `--format` or `twee.toml` names (`sugarcube`, `SugarCube@2.37.3`, `harlowe-3`), else the story's
   own, chosen as Tweego chooses: the same major version, the greatest at or above the one asked for.
 - **Sources:** `.twee`, `.tw` (and Twee2's `.twee2`, `.tw2`) files and folders of them, in name order, read as UTF-8
@@ -154,7 +157,7 @@ one. Paths in it are relative to it, and options on the command line win over it
 ```toml
 sources = ["src"]                  # default: src
 output = "dist/index.html"         # default: dist/index.html
-format = "SugarCube@2.37.3"        # pinned (default: the story's own)
+format = "SugarCube@2.37.3"        # at least this version, as Tweego reads it (default: the story's own)
 start = "Start"
 head = "head.html"                 # HTML for the page's <head>
 modules = ["modules"]              # JavaScript, CSS and fonts for the <head>, before the story runs
@@ -164,7 +167,7 @@ strict = false                     # stop on warnings too
 trim = true                        # trim spaces and blank lines at both ends of each passage, as Tweego does (also --no-trim)
 public = "public"                  # copied as it is beside the page; the default when the folder's there
 assets = ["../shared/art"]         # more folders copied beside the page, each by its name: dist/art
-format-paths = ["formats"]         # the project's own story formats, which win over every other
+format-paths = ["formats"]         # the project's own story formats, which win (default: formats/, when it's there)
 requires = "0.1"                   # the oldest twee-tools that builds this project
 
 [check]

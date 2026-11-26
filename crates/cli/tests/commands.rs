@@ -380,3 +380,31 @@ fn the_report_counts_words() {
     assert!(text(&run(&dir, &["build", "--check-only"])).contains(" words"), "the report's header says how many");
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn vendoring_keeps_a_format_whatever_twee_tools_bundles() {
+    let dir = project("vendor", "", "");
+    let vendored = plain(&dir, &["formats", "vendor"]);
+    assert!(vendored.status.success(), "{}", text(&vendored));
+    assert!(text(&vendored).contains("SugarCube 2.37.3"), "{}", text(&vendored));
+    assert!(dir.join("formats/sugarcube-2/format.js").is_file() && dir.join("formats/sugarcube-2/LICENSE").is_file());
+    // The project's copy is the one used, found in formats/ with no setting.
+    let listed = text(&plain(&dir, &["formats"]));
+    assert!(listed.lines().any(|l| l.starts_with("sugarcube-2") && l.contains("formats")), "{listed}");
+    // Change the copy's version to stand for an older SugarCube, and the build uses it.
+    let file = dir.join("formats/sugarcube-2/format.js");
+    std::fs::write(&file, std::fs::read_to_string(&file).unwrap().replacen("\"version\":\"2.37.3\"", "\"version\":\"2.37.1\"", 1)).unwrap();
+    let built = run(&dir, &["build"]);
+    assert!(text(&built).contains("SugarCube 2.37.1"), "{}", text(&built));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_build_says_when_it_uses_another_version_than_asked() {
+    let dir = project("other-version", "", "format = \"SugarCube@2.36.1\"\n");
+    let built = run(&dir, &["build"]);
+    assert!(built.status.success(), "{}", text(&built));
+    assert!(text(&built).contains("SugarCube@2.36.1 is asked for, and this builds with SugarCube 2.37.3"), "{}", text(&built));
+    assert!(text(&built).contains("formats vendor"), "{}", text(&built));
+    std::fs::remove_dir_all(&dir).unwrap();
+}

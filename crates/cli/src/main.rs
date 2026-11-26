@@ -256,6 +256,12 @@ enum FormatsCommand {
     Path,
     /// The licences of the formats built into this program.
     Licenses,
+    /// Copy a story format into the project's `formats` folder, where it wins over the built-in one, so every later
+    /// build uses exactly that version, whatever twee-tools bundles. Default: the format the project builds with.
+    Vendor {
+        /// The format to copy: a name, name@version or ID (`sugarcube`, `SugarCube@2.37.3`, `harlowe-3`).
+        format: Option<String>,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -376,6 +382,7 @@ fn main() -> ExitCode {
             };
             dev::run(settings, color)
         }
+        Command::Formats { what: Some(FormatsCommand::Vendor { format }) } => run_vendor(format),
         Command::Formats { what } => run_formats(what.unwrap_or(FormatsCommand::List)),
         Command::Check { story, json, config, ignore, errors_only, all, strict, color } => {
             run_check(story, config, ignore, strict, ReportOptions { json, errors_only, all, color })
@@ -686,12 +693,76 @@ fn run_init(dir: Option<PathBuf>, format: &str, name: Option<String>) -> ExitCod
     ExitCode::SUCCESS
 }
 
-fn run_formats(what: FormatsCommand) -> ExitCode {
-    // With a project, its own format folders too, as a build would look.
-    let mut folders = build::formats::search_folders();
-    if let Ok(Some(project)) = project::Project::find() {
-        folders.extend(project.format_paths.iter().flatten().map(|p| project.path(p)).filter(|p| p.is_dir()));
+/// `formats vendor`: copies a format into the project's own formats folder, so its builds keep that version.
+fn run_vendor(asked: Option<String>) -> ExitCode {
+    let fail = |message: String| {
+        eprintln!("{message}");
+        ExitCode::from(1)
+    };
+    let settings = match pipeline::Settings::new(pipeline::Settings::empty()) {
+        Ok(settings) => settings,
+        Err(error) => return fail(error),
+    };
+    let (formats, _) = build::formats::all(&pipeline::format_folders(&settings));
+    // The format asked for, else the one the project builds with: twee.toml's, else its story's own.
+    let chosen = match &asked {
+        Some(asked) => build::formats::choose(&formats, Some(asked), None, None),
+        None => {
+            let story = match Story::read_all_options(&settings.paths, &settings.exclude, !settings.no_trim) {
+                Ok(story) => story,
+                Err(error) => return fail(format!("{error}\nName the format to copy instead: `twee-tools formats vendor sugarcube`.")),
+            };
+            build::formats::choose(&formats, settings.format.as_deref(), story.format.as_deref(), story.format_version.as_deref())
+        }
+    };
+    let format = match chosen {
+        Ok(format) => format,
+        Err(error) => return fail(error),
+    };
+    let project = project::Project::find().ok().flatten().unwrap_or_default();
+    let folder = settings.format_paths.first().cloned().unwrap_or_else(|| project.path(std::path::Path::new("formats")));
+    let target = folder.join(&format.id);
+    if let build::formats::Origin::Folder(dir) = &format.origin
+        && dir.canonicalize().ok() == target.canonicalize().ok()
+    {
+        println!("{} {} is already in {}.", format.name, format.version, target.display());
+        return ExitCode::SUCCESS;
     }
+    if let Err(e) = std::fs::create_dir_all(&target) {
+        return fail(format!("{}: {e}", target.display()));
+    }
+    let written = match &format.origin {
+        // A built-in format: its format.js as bundled, and its licence.
+        build::formats::Origin::BuiltIn => build::formats::BUILT_IN
+            .iter()
+            .find(|(id, _, _)| *id == format.id)
+            .map_or(Ok(()), |(_, text, notice)| std::fs::write(target.join("format.js"), text).and_then(|_| std::fs::write(target.join("LICENSE"), notice))),
+        // One installed elsewhere: its folder's files, as they are.
+        build::formats::Origin::Folder(dir) => std::fs::read_dir(dir).and_then(|entries| {
+            for entry in entries.flatten().filter(|e| e.path().is_file()) {
+                std::fs::copy(entry.path(), target.join(entry.file_name()))?;
+            }
+            Ok(())
+        }),
+    };
+    if let Err(e) = written {
+        return fail(format!("{}: {e}", target.display()));
+    }
+    println!(
+        "Copied {} {} to {}: this project builds with it from now on, whatever version twee-tools bundles.",
+        format.name,
+        format.version,
+        target.display()
+    );
+    ExitCode::SUCCESS
+}
+
+fn run_formats(what: FormatsCommand) -> ExitCode {
+    // Where a build looks: with a project, its own format folders too.
+    let folders = match pipeline::Settings::new(pipeline::Settings::empty()) {
+        Ok(settings) => pipeline::format_folders(&settings),
+        Err(_) => build::formats::search_folders(),
+    };
     match what {
         FormatsCommand::List => {
             let (formats, notes) = build::formats::all(&folders);
@@ -724,6 +795,7 @@ fn run_formats(what: FormatsCommand) -> ExitCode {
                 println!("==== {id} ====\n\n{}\n", notice.trim());
             }
         }
+        FormatsCommand::Vendor { .. } => unreachable!("vendor has its own command"),
     }
     ExitCode::SUCCESS
 }

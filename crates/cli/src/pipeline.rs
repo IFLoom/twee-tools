@@ -118,7 +118,12 @@ impl Settings {
                 Some(folder)
             }
         };
-        args.format_paths.extend(project.format_paths.iter().flatten().map(|p| project.path(p)));
+        // The project's own formats: twee.toml's format-paths, else a `formats` folder if it's there (where `formats
+        // vendor` puts them).
+        match &project.format_paths {
+            Some(paths) => args.format_paths.extend(paths.iter().map(|p| project.path(p))),
+            None => args.format_paths.extend(Some(project.path(Path::new("formats"))).filter(|p| p.is_dir())),
+        }
         if args.dev
             && let Some(dev) = &project.dev
         {
@@ -249,6 +254,7 @@ pub fn run(settings: &Settings, progress: check::Progress) -> Outcome {
         Ok(format) => format,
         Err(error) => return Outcome::Failed(error),
     };
+    notes.extend(other_version(settings.format.as_deref(), format));
     let mut kept_report = None;
     if settings.check_only {
         let report = check_with(&story, &config, progress);
@@ -308,6 +314,18 @@ pub fn format_folders(settings: &Settings) -> Vec<PathBuf> {
     let mut folders = build::formats::search_folders();
     folders.extend(settings.format_paths.iter().filter(|p| p.is_dir()).cloned());
     folders
+}
+
+/// When the format asked for by version (`SugarCube@2.37.3`) is built with another version (a newer one of the same
+/// major, as Tweego chooses): a note saying so, and how to keep the one asked for.
+pub fn other_version(asked: Option<&str>, format: &build::formats::Format) -> Option<String> {
+    let (name, version) = asked?.split_once('@')?;
+    (story::parse_version(version).is_some() && version != format.version).then(|| {
+        format!(
+            "{name}@{version} is asked for, and this builds with {} {}, the newest of that major version it has; `twee-tools formats vendor` keeps a version in the project",
+            format.name, format.version
+        )
+    })
 }
 
 /// Whether a report stops a build: any error, or with strict, any warning. `check` and `build --check-only` fail by the
