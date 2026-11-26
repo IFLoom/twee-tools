@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "build"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
@@ -315,7 +315,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "check"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aho-corasick",
  "oxc_allocator",
@@ -1100,7 +1100,7 @@ dependencies = [
 
 [[package]]
 name = "media"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "check",
  "html-escape",
@@ -2157,7 +2157,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "story"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "globset",
  "scraper",
@@ -2357,7 +2357,7 @@ checksum = "009dbb7700f11c55ef83aebbe4c0e9cf1f1ac0844bd8d6f00dc38f302026e13a"
 
 [[package]]
 name = "twee-tools"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "build",
  "check",
