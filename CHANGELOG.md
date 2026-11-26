@@ -17,7 +17,7 @@ The first release.
   every build too; findings with file, line and "did you mean"; `--json` reports.
 - `dev`: build, serve and reload on every save, showing errors over the last good build.
 - `compress` and `build --compress-to`: a release copy with images re-encoded as WebP (quality, lossless, effort).
-- `init`, `decompile` and `formats`.
+- `init`, `decompile`, `formats`, and `formats vendor` to keep a story format's exact version in a project.
 - `twee.toml`: sources, output, a pinned format, `public/` and assets, excludes, `[check]`, `[dev]`, `[compress]`,
   `requires`, `trim`.
 - Install scripts for Linux, macOS and Windows, and `twee-tools upgrade`.

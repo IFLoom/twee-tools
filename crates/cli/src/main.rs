@@ -5,6 +5,7 @@ mod pipeline;
 mod project;
 mod render;
 mod spinner;
+mod upgrade;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -176,6 +177,15 @@ enum Command {
     Formats {
         #[command(subcommand)]
         what: Option<FormatsCommand>,
+    },
+    /// Install the latest twee-tools in place of this one, checked against the release's checksums.
+    Upgrade {
+        /// Install this version instead, newer or older: 0.2.0.
+        #[arg(long, value_name = "X.Y.Z")]
+        version: Option<String>,
+        /// Only say whether there's a newer version.
+        #[arg(long, conflicts_with = "version")]
+        check: bool,
     },
     /// Check a published page (.html): links, passages nothing reaches, variables, macros and media. Twee: build --check-only.
     Check {
@@ -383,6 +393,16 @@ fn main() -> ExitCode {
             dev::run(settings, color)
         }
         Command::Formats { what: Some(FormatsCommand::Vendor { format }) } => run_vendor(format),
+        Command::Upgrade { version, check } => match upgrade::run(upgrade::Options { version, check }) {
+            Ok(said) => {
+                println!("{said}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("twee-tools upgrade: {error}");
+                ExitCode::from(1)
+            }
+        },
         Command::Formats { what } => run_formats(what.unwrap_or(FormatsCommand::List)),
         Command::Check { story, json, config, ignore, errors_only, all, strict, color } => {
             run_check(story, config, ignore, strict, ReportOptions { json, errors_only, all, color })

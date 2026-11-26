@@ -124,6 +124,7 @@ twee-tools decompile story.html --split src/     # a published story back to Twe
 | `decompile <page>` | Turn a published story (or a Twine archive) back into Twee: one file, or `--split` into many. |
 | `formats [list \| path \| licenses]` | The story formats: built in, installed where Tweego looks, and the project's own. |
 | `formats vendor [format]` | Copy a story format into the project's `formats/`, so its builds keep that exact version. |
+| `upgrade [--version x.y.z] [--check]` | Install the latest twee-tools (or that version) in place of this one. |
 
 Every command takes `-C <dir>` to run as if started in another folder, and `twee-tools <command> --help` lists the
 rest of its options.

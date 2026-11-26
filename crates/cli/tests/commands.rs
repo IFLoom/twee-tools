@@ -408,3 +408,101 @@ fn a_build_says_when_it_uses_another_version_than_asked() {
     assert!(text(&built).contains("formats vendor"), "{}", text(&built));
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// Serves the files in `dir` over HTTP on a free port, for as long as the test runs: a stand-in for a release.
+fn serve(dir: PathBuf) -> String {
+    use std::io::{BufRead, BufReader, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let mut reader = BufReader::new(&stream);
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap_or(0);
+            // The rest of the request's head.
+            let mut header = String::new();
+            while reader.read_line(&mut header).unwrap_or(0) > 2 {
+                header.clear();
+            }
+            let path = line.split_whitespace().nth(1).unwrap_or("/").trim_start_matches('/').to_string();
+            let mut stream = &stream;
+            match std::fs::read(dir.join(&path)) {
+                Ok(body) => {
+                    let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                    let _ = stream.write_all(&body);
+                }
+                Err(_) => {
+                    let _ = write!(stream, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                }
+            }
+        }
+    });
+    url
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_installs_a_checked_release_in_place() {
+    use sha2::{Digest, Sha256};
+    use std::os::unix::fs::PermissionsExt;
+    let dir = std::env::temp_dir().join(format!("twee-tools-upgrade-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let (bin, release) = (dir.join("bin"), dir.join("release"));
+    std::fs::create_dir_all(&bin).unwrap();
+    std::fs::create_dir_all(&release).unwrap();
+    // An installed copy of this build, as the install script leaves it.
+    let installed = bin.join("twee-tools");
+    std::fs::copy(BIN, &installed).unwrap();
+    // The "new release": a stand-in program under every system's name, its checksums, and its VERSION.
+    let new = b"#!/bin/sh\necho twee-tools 9.9.9\n";
+    let sum: String = Sha256::digest(new).iter().map(|b| format!("{b:02x}")).collect();
+    let mut sums = String::new();
+    for target in ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "aarch64-apple-darwin"] {
+        std::fs::write(release.join(format!("twee-tools-{target}")), new).unwrap();
+        sums.push_str(&format!("{sum}  twee-tools-{target}\n"));
+    }
+    std::fs::write(release.join("VERSION"), "9.9.9\n").unwrap();
+    let url = serve(release.clone());
+    let upgrade = |args: &[&str]| Command::new(&installed).arg("upgrade").args(args).env("TWEE_TOOLS_DOWNLOAD_URL", &url).output().unwrap();
+
+    // --check says there's a newer one, and changes nothing.
+    let checked = upgrade(&["--check"]);
+    assert!(text(&checked).contains("twee-tools 9.9.9 is out"), "{}", text(&checked));
+    // Checksums that don't match: refused, and the installed copy is untouched.
+    std::fs::write(release.join("SHA256SUMS"), sums.replace(&sum, &"0".repeat(64))).unwrap();
+    let refused = upgrade(&[]);
+    assert_eq!(refused.status.code(), Some(1), "{}", text(&refused));
+    assert!(text(&refused).contains("doesn't match its checksum"), "{}", text(&refused));
+    assert_eq!(std::fs::read(&installed).unwrap(), std::fs::read(BIN).unwrap());
+    // With the right checksums, the new release takes its place.
+    std::fs::write(release.join("SHA256SUMS"), &sums).unwrap();
+    let upgraded = upgrade(&[]);
+    assert!(upgraded.status.success(), "{}", text(&upgraded));
+    assert!(text(&upgraded).contains(&format!("Upgraded twee-tools {} to 9.9.9", env!("CARGO_PKG_VERSION"))), "{}", text(&upgraded));
+    assert_eq!(std::fs::read(&installed).unwrap(), new);
+    assert!(std::fs::metadata(&installed).unwrap().permissions().mode() & 0o111 != 0);
+    // Nothing is left beside it.
+    assert_eq!(std::fs::read_dir(&bin).unwrap().count(), 1);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn upgrade_says_when_this_is_the_latest() {
+    let dir = std::env::temp_dir().join(format!("twee-tools-latest-{}", std::process::id()));
+    let (bin, release) = (dir.join("bin"), dir.join("release"));
+    std::fs::create_dir_all(&bin).unwrap();
+    std::fs::create_dir_all(&release).unwrap();
+    let installed = bin.join(format!("twee-tools{}", std::env::consts::EXE_SUFFIX));
+    std::fs::copy(BIN, &installed).unwrap();
+    std::fs::write(release.join("VERSION"), env!("CARGO_PKG_VERSION")).unwrap();
+    let url = serve(release);
+    for args in [&[][..], &["--check"][..]] {
+        let said = Command::new(&installed).arg("upgrade").args(args).env("TWEE_TOOLS_DOWNLOAD_URL", &url).output().unwrap();
+        assert!(said.status.success(), "{}", text(&said));
+        assert!(text(&said).contains("is the latest"), "{}", text(&said));
+    }
+    // A build from source is left to be rebuilt.
+    let source = Command::new(BIN).arg("upgrade").output().unwrap();
+    assert!(text(&source).contains("built from source"), "{}", text(&source));
+    std::fs::remove_dir_all(&dir).unwrap();
+}

@@ -161,6 +161,8 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           cp scripts/install.sh scripts/install.ps1 dist/
+          # The version `twee-tools upgrade` reads from the latest release.
+          echo "$VERSION" > dist/VERSION
           (cd dist && sha256sum * > SHA256SUMS)
           cat dist/SHA256SUMS
           # The release's notes: its section of the changelog.
