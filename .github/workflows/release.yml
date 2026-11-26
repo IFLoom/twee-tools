@@ -189,8 +189,10 @@ jobs:
         run: gh release create "v$VERSION" dist/* --title "twee-tools $VERSION" --notes-file notes.md --verify-tag
 
   # The npm packages, after the GitHub release: each system's, then @ifloom/twee-tools, which depends on them. Each version
-  # already on npm is left as it is, so a run can be repeated. Publishing needs the NPM_TOKEN secret (an npm token that
-  # can publish to the @ifloom scope); without it this says so and skips. Provenance needs a public repository.
+  # already on npm is left as it is, so a run can be repeated. npm signs in by trusted publishing: each package names
+  # this repository and release.yml as its publisher on npmjs.com, and npm trades this job's GitHub identity
+  # (id-token) for a token that lasts only for the publish. Until a package is set up that way, the NPM_TOKEN secret is
+  # the fallback. Provenance, which trusted publishing adds by itself, needs a public repository.
   npm:
     name: npm
     needs: [version, publish]
@@ -209,16 +211,15 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later, newer than Node 22's own.
+      - run: npm install --global npm@latest && npm --version
       - name: Publish
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          # Only used for a package not yet set up for trusted publishing; empty once the secret is deleted.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           PRIVATE: ${{ github.event.repository.private }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning::No NPM_TOKEN secret, so nothing was published to npm."
-            exit 0
-          fi
           python3 scripts/npm-packages.py --version "$VERSION" --dist dist --out npm-out
           provenance=$([ "$PRIVATE" = false ] && echo --provenance || true)
           for folder in npm-out/twee-tools-* npm-out/twee-tools; do

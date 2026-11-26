@@ -409,7 +409,8 @@ cargo fmt                                  # rustfmt.toml: 160 columns
   `crates/check/src/chapbook.rs`. A test fails until the two agree.
 - **npm:** `scripts/npm-packages.py` makes the npm packages from a release's archives: `npm/twee-tools` is the
   main one's launcher and README. The release workflow tries them on each system and publishes them after the GitHub
-  release, given an `NPM_TOKEN` secret.
+  release, signed in by npm's trusted publishing (each package names this repository's `release.yml` as its
+  publisher on npmjs.com), or by an `NPM_TOKEN` secret for a package that isn't set up that way yet.
 - **Releasing:** add each change to `CHANGELOG.md`'s Unreleased section as it's made. `scripts/release.sh 0.2.0`
   sets the version, closes that section, runs the tests, commits and tags; pushing the tag
   (`git push origin main v0.2.0`) runs `.github/workflows/release.yml`, which builds the five binaries, tries the
