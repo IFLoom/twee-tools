@@ -57,13 +57,35 @@ names the story format it's written for (`format = "SugarCube@2.37.3"` in `twee.
 and `twee-tools formats vendor` keeps that exact version in the project, so a newer twee-tools still builds the same
 page.
 
-- **Prebuilt binaries** for Linux, macOS and Windows will be on the
-  [releases page](https://github.com/IFLoom/twee-tools/releases), with a one-line install script, from the first
-  release; Homebrew and Scoop after that.
+- **Linux and macOS:**
+
+  ```sh
+  curl -fsSL https://github.com/IFLoom/twee-tools/releases/latest/download/install.sh | sh
+  ```
+
+  It installs to `~/.local/bin` (`TWEE_TOOLS_INSTALL_DIR` changes that) and says if that folder isn't on your PATH.
+- **Windows,** in PowerShell:
+
+  ```powershell
+  irm https://github.com/IFLoom/twee-tools/releases/latest/download/install.ps1 | iex
+  ```
+
+  It installs to `%LOCALAPPDATA%\Programs\twee-tools` and adds that folder to your PATH.
+- **By hand:** each [release](https://github.com/IFLoom/twee-tools/releases) has an archive for each system (Linux
+  x86-64 and ARM, macOS Apple silicon and Intel, Windows x64), with `SHA256SUMS` to check them against. The Linux
+  builds are static, so they run on any distribution.
 - **With Rust installed:** `cargo install --git https://github.com/IFLoom/twee-tools twee-tools` builds and installs
   it from the repository, or, in a checkout, `cargo install --path crates/cli`.
 - **npm** (planned, if asked for): `npm i -D twee-tools`, one binary per platform as esbuild ships, for JavaScript
   projects that want the version in their lock file.
+
+Both scripts download the release for your system and check it against the release's checksums before installing.
+`TWEE_TOOLS_VERSION=0.2.0` installs one particular version, newer or older.
+
+**Upgrading:** `twee-tools upgrade` installs the latest release in place of the running one, checked the same way
+(`--version 0.2.0` for one particular version, `--check` to only say whether there's a newer one). If twee-tools came
+from Homebrew, Scoop or `cargo install`, it says to upgrade with those instead. twee-tools goes online only when you
+run `upgrade`.
 
 ## Quick start
 
@@ -368,6 +390,11 @@ cargo fmt                                  # rustfmt.toml: 160 columns
 - **Updating a built-in format:** replace its folder in `crates/build/formats/`. For Harlowe, then run
   `python3 scripts/harlowe-macros.py` to regenerate its macro table; for Chapbook, update the patterns in
   `crates/check/src/chapbook.rs`. A test fails until the two agree.
+- **Releasing:** add each change to `CHANGELOG.md`'s Unreleased section as it's made. `scripts/release.sh 0.2.0`
+  sets the version, closes that section, runs the tests, commits and tags; pushing the tag
+  (`git push origin main v0.2.0`) runs `.github/workflows/release.yml`, which builds the five binaries, tries the
+  install scripts and publishes the GitHub release. Running that workflow by hand builds everything and publishes
+  nothing. `scripts/notices.py` writes the third-party notices each archive carries.
 - **Scripts:** `scripts/boots.mjs` loads a built story in headless Chrome and says whether it started;
   `scripts/same-images.mjs` plays every passage and records its images, to compare a story with its compressed copy.
 
