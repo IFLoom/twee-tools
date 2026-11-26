@@ -73,6 +73,8 @@ pub struct Stats {
 
 #[derive(Debug, Serialize)]
 pub struct Report {
+    /// The version of this report's shape, raised only when it changes in a way a reader of `--json` would notice.
+    pub report: u32,
     pub findings: Vec<Finding>,
     pub stats: Stats,
     pub media: MediaSummary,
@@ -97,6 +99,9 @@ impl Report {
         self.findings.iter().filter(|f| f.severity == Severity::Error).count()
     }
 }
+
+/// The shape of `--json` reports: 1 is `report`, `findings`, `stats` and `media` as they are now.
+pub const REPORT_VERSION: u32 = 1;
 
 /// What a long job says it's doing, for a spinner: "Checking media 120 of 2570".
 pub use story::Progress;
@@ -179,7 +184,7 @@ pub fn check_with(story: &Story, config: &Config, progress: Progress) -> Report 
     let (mut findings, stats, summary) = out.into_parts();
     settle(&mut findings, &ix, config);
     findings.sort_by(|a, b| (a.file.clone(), a.line, a.severity, a.code).cmp(&(b.file.clone(), b.line, b.severity, b.code)));
-    Report { findings, stats, media: summary }
+    Report { report: REPORT_VERSION, findings, stats, media: summary }
 }
 
 /// A file's kind by its extension, as people write it: WebM, MP4, MP3.

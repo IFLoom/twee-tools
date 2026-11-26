@@ -110,7 +110,15 @@ impl Project {
 
     pub fn read(file: &Path) -> Result<Project, String> {
         let text = std::fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
-        let mut project: Project = toml::from_str(&text).map_err(|e| format!("{}: {e}", file.display()))?;
+        let mut project: Project = toml::from_str(&text).map_err(|e| {
+            // A key this twee-tools doesn't know is most often one a newer twee-tools added.
+            let newer = if e.message().starts_with("unknown field") {
+                format!("\nIf that's from a newer twee-tools, upgrade (this is {}): `twee-tools upgrade`.", env!("CARGO_PKG_VERSION"))
+            } else {
+                String::new()
+            };
+            format!("{}: {e}{newer}", file.display())
+        })?;
         project.root = file.parent().map(Path::to_path_buf).unwrap_or_default();
         if let Some(required) = &project.requires {
             let have = env!("CARGO_PKG_VERSION");

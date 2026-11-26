@@ -323,6 +323,24 @@ With its checks on, which no other compiler has, twee-tools checks the 20,000-pa
 914-passage game in 0.23 s: a whole check costs less than Tweego takes to build. `scripts/bench.py` reruns the
 benchmark, and `scripts/synthetic.py` makes the synthetic stories.
 
+## Versioning
+
+twee-tools follows [semantic versioning](https://semver.org). Its public surface is what a project or a script
+relies on: the command-line options, the `twee.toml` keys, the exit codes, the finding codes, the shape of the
+`--json` report (which says its own version, `"report": 1`), and which story-format versions are built in. Before
+1.0, a change that breaks any of these raises the minor version (0.1 to 0.2), and anything else the patch (0.1.0 to
+0.1.1). Every change is in [CHANGELOG.md](CHANGELOG.md).
+
+**Upgrading a project:**
+
+- **A key a newer twee-tools added** stops an older one, which says so and suggests upgrading. Add
+  `requires = "0.2"` to say outright which twee-tools a project needs.
+- **A key that's renamed or retired** keeps working, with a warning saying what replaces it, for at least one minor
+  version.
+- **Story formats** change built pages most of all. `format = "SugarCube@2.37.3"` asks for at least that version, as
+  Tweego reads it, so a newer twee-tools with a newer SugarCube builds with that, and says so. To keep a version for
+  good, `twee-tools formats vendor` copies the format into the project, where it wins over the built-in one.
+
 ## Development
 
 ```sh
