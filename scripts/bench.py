@@ -3,7 +3,8 @@
 # Stories: real projects, or ones made by scripts/synthetic.py. RUNS=n sets the runs per tool (default 7).
 import os, subprocess, statistics, sys, time, glob, shutil
 B = sys.argv[1]
-TT = os.path.expanduser('~/work/personal/twee-tools/target/release/twee-tools')
+# This checkout's release build: cargo build --release.
+TT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'target', 'release', 'twee-tools')
 TWEEGO = f'{B}/tweego/tweego'
 NODE_BIN = f'{B}/node/node_modules/.bin'
 FORMAT_DIR = f'{B}/tweego/storyformats'
@@ -29,7 +30,7 @@ def tools(corpus):
     name = os.path.basename(corpus)
     return [
         ('twee-tools (compile)', [TT, 'build', corpus, '-o', f'{OUT}/{name}-tt.html', '--no-check', '--format', 'sugarcube-2', '--color', 'never']),
-        ('twee-tools check', [TT, 'check', corpus, '--color', 'never']),
+        ('twee-tools check', [TT, 'build', corpus, '--check-only', '-o', f'{OUT}/{name}-check.html', '--format', 'sugarcube-2', '--color', 'never']),
         ('Tweego 2.1.1', [TWEEGO, '-o', f'{OUT}/{name}-tweego.html', corpus]),
         ('twee-ts 2.1.0', [f'{NODE_BIN}/twee-ts', '--no-config', '--no-remote', '-f', 'sugarcube-2', '-o', f'{OUT}/{name}-tts.html', corpus]),
         ('Extwee 2.4.3', [f'{NODE_BIN}/extwee', '-c', '-i', merged(corpus), '-s', FORMAT_JS, '-o', f'{OUT}/{name}-extwee.html']),
