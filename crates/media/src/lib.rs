@@ -217,8 +217,8 @@ pub fn compress_with(story: &Story, out: &Path, options: &Options, progress: sto
         ));
     }
     if !options.dry_run {
-        let root = fs::canonicalize(&story.root).map_err(|e| e.to_string())?;
-        let target = out.canonicalize().unwrap_or_else(|_| out.to_path_buf());
+        let root = resolved(&story.root);
+        let target = resolved(out);
         if target == root || target.starts_with(&root) {
             return Err(format!("Write the copy outside the story's folder, not to {}.", out.display()));
         }
@@ -413,6 +413,27 @@ pub fn compress_with(story: &Story, out: &Path, options: &Options, progress: sto
     }
     report.rewritten = rewritten;
     Ok(report)
+}
+
+/// A path made absolute with its links resolved, to compare folders: the deepest part that exists, resolved, then the
+/// rest as written. A folder not made yet still compares truly, where macOS's `/var` is `/private/var` and Windows
+/// resolves `C:\` to `\\?\C:\`.
+fn resolved(path: &Path) -> PathBuf {
+    let absolute = if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().unwrap_or_default().join(path) };
+    let mut existing = absolute.as_path();
+    let mut rest = vec![];
+    loop {
+        if let Ok(real) = fs::canonicalize(existing) {
+            return rest.iter().rev().fold(real, |path, part| path.join(part));
+        }
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name.to_os_string());
+                existing = parent;
+            }
+            _ => return absolute,
+        }
+    }
 }
 
 fn is_html(file: &Path) -> bool {

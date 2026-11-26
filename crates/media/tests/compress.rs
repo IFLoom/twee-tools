@@ -231,3 +231,19 @@ fn lossless_keeps_every_pixel_and_bad_settings_are_refused() {
     }
     fs::remove_dir_all(&dir).unwrap();
 }
+
+/// The copy is never written into the story's folder, through a link to it or a folder not made yet (macOS's `/var` is a
+/// link to `/private/var`).
+#[cfg(unix)]
+#[test]
+fn refuses_the_story_folder_reached_through_a_link() {
+    let dir = scratch("linked");
+    write_story(&dir, r#"<tw-passagedata pid="1" name="Start" tags="">Hi.</tw-passagedata>"#);
+    let link = scratch("linked-alias");
+    fs::remove_dir_all(&link).unwrap();
+    std::os::unix::fs::symlink(&dir, &link).unwrap();
+    let story = Story::read(&dir.join("index.html")).unwrap();
+    assert!(compress(&story, &link.join("new/out"), &Options::default()).is_err(), "inside the story's folder, through the link");
+    fs::remove_file(&link).unwrap();
+    fs::remove_dir_all(&dir).unwrap();
+}

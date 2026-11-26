@@ -58,4 +58,5 @@ jobs:
           clone twee-ts https://github.com/rohal12/twee-ts 67984a1f56813c89a9a8fa0905a851eea366e408
 
       - run: cargo clippy --all-targets
-      - run: cargo test
+      # Every test program, even after one fails, so a run shows every failure on every system.
+      - run: cargo test --no-fail-fast
