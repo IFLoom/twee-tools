@@ -9,7 +9,7 @@ root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 args = ['cargo', 'metadata', '--format-version', '1', '--locked']
 if '--target' in sys.argv:
     args += ['--filter-platform', sys.argv[sys.argv.index('--target') + 1]]
-meta = json.loads(subprocess.run(args, cwd=root, capture_output=True, text=True, check=True).stdout)
+meta = json.loads(subprocess.run(args, cwd=root, capture_output=True, encoding='utf-8', check=True).stdout)
 
 ours = set(meta['workspace_members'])
 # Only what the twee-tools binary depends on, not tests or build tools: follow normal dependencies from the CLI crate.
@@ -84,4 +84,5 @@ named = {part.strip('() ') for expr in missing for part in expr.replace(' OR ', 
 out += ['## Licence texts', '', 'The standard text of each licence named above by a crate that ships no licence file.', '']
 for name in [n for n in standard if n in named]:
     out += [f'### {name}', '', '```', standard[name].strip(), '```', '']
-sys.stdout.write('\n'.join(out) + '\n')
+# As UTF-8 bytes: on Windows, Python would otherwise write the console's code page.
+sys.stdout.buffer.write(('\n'.join(out) + '\n').encode('utf-8'))
