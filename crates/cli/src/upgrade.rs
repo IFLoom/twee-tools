@@ -1,6 +1,6 @@
 //! `twee-tools upgrade`: installs the latest release (or a given one) in place of the running program, after checking
 //! it against the release's checksums. A copy that Homebrew, Scoop or `cargo install` put there is theirs to upgrade, so
-//! for those it says how instead. Nothing else in twee-tools goes online.
+//! for those it says how instead. Besides this, twee-tools goes online only to fetch the version a project pins (`pin.rs`).
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -33,34 +33,13 @@ pub(crate) fn run(options: Options) -> Result<String, String> {
     {
         return Err(format!("{version} isn't a version: give it as x.y.z"));
     }
-    // Where the release's files are: TWEE_TOOLS_DOWNLOAD_URL (a mirror, or a test), else the GitHub release.
-    let base = match (std::env::var("TWEE_TOOLS_DOWNLOAD_URL").ok().filter(|u| !u.is_empty()), &wanted) {
-        (Some(url), _) => url.trim_end_matches('/').to_string(),
-        (None, Some(version)) => format!("{REPO}/releases/download/v{version}"),
-        (None, None) => format!("{REPO}/releases/latest/download"),
-    };
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(300)))
-        .user_agent(concat!("twee-tools/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .into();
-    let get = |name: &str| -> Result<Vec<u8>, String> {
-        let url = format!("{base}/{name}");
-        let mut response = agent.get(&url).call().map_err(|e| match e {
-            ureq::Error::StatusCode(404) => match &wanted {
-                Some(version) => format!("{url} isn't there: is {version} a released version?"),
-                None => format!("{url} isn't there: there's no published release to upgrade to yet"),
-            },
-            e => format!("couldn't download {url}: {e}"),
-        })?;
-        response.body_mut().with_config().limit(256 * 1024 * 1024).read_to_vec().map_err(|e| format!("couldn't download {url}: {e}"))
-    };
+    let release = Release::new(wanted.as_deref());
 
     // The version to install: the one asked for, else the latest release's.
     let latest = match &wanted {
         Some(version) => version.clone(),
         None => {
-            let text = String::from_utf8_lossy(&get("VERSION")?).trim().trim_start_matches('v').to_string();
+            let text = String::from_utf8_lossy(&release.get("VERSION")?).trim().trim_start_matches('v').to_string();
             story::parse_version(&text).ok_or_else(|| format!("the release's VERSION file says {text:?}, which isn't a version"))?;
             text
         }
@@ -80,20 +59,7 @@ pub(crate) fn run(options: Options) -> Result<String, String> {
         return Ok(format!("twee-tools {current} is already installed."));
     }
 
-    // The release's binary for this system, checked against its checksums.
-    let name = format!("twee-tools-{target}{}", std::env::consts::EXE_SUFFIX);
-    let sums = String::from_utf8_lossy(&get("SHA256SUMS")?).into_owned();
-    let expected = sums
-        .lines()
-        .filter_map(|line| line.split_once(char::is_whitespace))
-        .find(|(_, file)| file.trim().trim_start_matches('*') == name)
-        .map(|(sum, _)| sum.to_ascii_lowercase())
-        .ok_or_else(|| format!("the release's SHA256SUMS doesn't list {name}"))?;
-    let binary = get(&name)?;
-    let actual: String = Sha256::digest(&binary).iter().map(|b| format!("{b:02x}")).collect();
-    if actual != expected {
-        return Err(format!("{name} doesn't match its checksum: the download is damaged or not the release's. Nothing was changed."));
-    }
+    let binary = release.binary(target)?;
 
     // Beside this program (so the swap is a rename on one disk), tried, then swapped in.
     let folder = exe.parent().ok_or("couldn't find this program's folder")?;
@@ -102,6 +68,59 @@ pub(crate) fn run(options: Options) -> Result<String, String> {
     let _ = std::fs::remove_file(&new);
     result?;
     Ok(format!("Upgraded twee-tools {current} to {latest}. What's new: {REPO}/releases/tag/v{latest}"))
+}
+
+/// A release's files: a given version's, else the latest's, from GitHub, or from TWEE_TOOLS_DOWNLOAD_URL (a mirror, or a
+/// test's server).
+pub(crate) struct Release {
+    base: String,
+    version: Option<String>,
+    agent: ureq::Agent,
+}
+
+impl Release {
+    pub(crate) fn new(version: Option<&str>) -> Release {
+        let base = match (std::env::var("TWEE_TOOLS_DOWNLOAD_URL").ok().filter(|u| !u.is_empty()), version) {
+            (Some(url), _) => url.trim_end_matches('/').to_string(),
+            (None, Some(version)) => format!("{REPO}/releases/download/v{version}"),
+            (None, None) => format!("{REPO}/releases/latest/download"),
+        };
+        let agent = ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(300)))
+            .user_agent(concat!("twee-tools/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .into();
+        Release { base, version: version.map(str::to_string), agent }
+    }
+
+    /// One of the release's files.
+    pub(crate) fn get(&self, name: &str) -> Result<Vec<u8>, String> {
+        let url = format!("{}/{name}", self.base);
+        let mut response = self.agent.get(&url).call().map_err(|e| match (e, &self.version) {
+            (ureq::Error::StatusCode(404), Some(version)) => format!("{url} isn't there: is {version} a released version?"),
+            (ureq::Error::StatusCode(404), None) => format!("{url} isn't there: there's no published release to upgrade to yet"),
+            (e, _) => format!("couldn't download {url}: {e}"),
+        })?;
+        response.body_mut().with_config().limit(256 * 1024 * 1024).read_to_vec().map_err(|e| format!("couldn't download {url}: {e}"))
+    }
+
+    /// The release's binary for a system, checked against the release's checksums.
+    pub(crate) fn binary(&self, target: &str) -> Result<Vec<u8>, String> {
+        let name = format!("twee-tools-{target}{}", std::env::consts::EXE_SUFFIX);
+        let sums = String::from_utf8_lossy(&self.get("SHA256SUMS")?).into_owned();
+        let expected = sums
+            .lines()
+            .filter_map(|line| line.split_once(char::is_whitespace))
+            .find(|(_, file)| file.trim().trim_start_matches('*') == name)
+            .map(|(sum, _)| sum.to_ascii_lowercase())
+            .ok_or_else(|| format!("the release's SHA256SUMS doesn't list {name}"))?;
+        let binary = self.get(&name)?;
+        let actual: String = Sha256::digest(&binary).iter().map(|b| format!("{b:02x}")).collect();
+        if actual != expected {
+            return Err(format!("{name} doesn't match its checksum: the download is damaged or not the release's. Nothing was changed."));
+        }
+        Ok(binary)
+    }
 }
 
 /// Writes the new binary, checks that it runs and is the version expected, then swaps it in for `exe`.
@@ -135,6 +154,9 @@ fn managed(exe: &Path) -> Option<String> {
     if has("/cellar/") || has("/homebrew/") || has("/linuxbrew/") {
         return Some("This twee-tools came from Homebrew: upgrade it with `brew upgrade twee-tools`.".into());
     }
+    if has("/node_modules/") {
+        return Some("This twee-tools came from npm: upgrade it with `npm install @ifloom/twee-tools@latest`, in the project that has it.".into());
+    }
     if has("/scoop/") {
         return Some("This twee-tools came from Scoop: upgrade it with `scoop update twee-tools`.".into());
     }
@@ -152,7 +174,7 @@ fn managed(exe: &Path) -> Option<String> {
 }
 
 /// The name of this system's release build, as the release names its files.
-fn target() -> Option<&'static str> {
+pub(crate) fn target() -> Option<&'static str> {
     if cfg!(windows) {
         // One build, for x64, which Windows on Arm also runs.
         return cfg!(any(target_arch = "x86_64", target_arch = "aarch64")).then_some("x86_64-pc-windows-msvc");

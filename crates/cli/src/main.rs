@@ -1,6 +1,7 @@
 //! `twee-tools build`, `check`, `compress` and `formats`.
 
 mod dev;
+mod pin;
 mod pipeline;
 mod project;
 mod render;
@@ -293,6 +294,10 @@ fn main() -> ExitCode {
     // SAFETY: setting a signal's handler to the default, before any other thread starts.
     unsafe {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+    // A project that pins another twee-tools runs that one, before this one reads its command line.
+    if let Some(code) = pin::follow() {
+        return code;
     }
     let cli = Cli::parse();
     if let Some(dir) = &cli.directory

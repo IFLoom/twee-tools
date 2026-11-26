@@ -6,6 +6,16 @@ Each change goes under **Unreleased** as it's made; `scripts/release.sh` turns t
 
 ## [Unreleased]
 
+### Added
+
+- `twee-tools = "x.y.z"` in `twee.toml` pins the twee-tools a project builds with: any other version downloads that
+  one once, checks it, and runs it in its place.
+- `upgrade` recognises a copy installed with npm, and says to upgrade it with npm.
+
+### Changed
+
+- The `twee.toml` that `init` writes says the story format's version is a minimum, and shows the new pin.
+
 ## [0.1.0] - 2026-11-26
 
 The first release.

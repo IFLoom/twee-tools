@@ -506,3 +506,94 @@ fn upgrade_says_when_this_is_the_latest() {
     assert!(text(&source).contains("built from source"), "{}", text(&source));
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// A "release" of version 9.9.9 to pin: a stand-in program under every Unix system's name, which says it ran and with
+/// what, and its checksums.
+#[cfg(unix)]
+fn pinnable_release(dir: &Path, sums_ok: bool) -> PathBuf {
+    use sha2::{Digest, Sha256};
+    let release = dir.join("release");
+    std::fs::create_dir_all(&release).unwrap();
+    let program = b"#!/bin/sh\necho \"twee-tools 9.9.9 ran: $*\"\n";
+    let sum: String = Sha256::digest(program).iter().map(|b| format!("{b:02x}")).collect();
+    let sum = if sums_ok { sum } else { "0".repeat(64) };
+    let mut sums = String::new();
+    for target in ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "aarch64-apple-darwin"] {
+        std::fs::write(release.join(format!("twee-tools-{target}")), program).unwrap();
+        sums.push_str(&format!("{sum}  twee-tools-{target}\n"));
+    }
+    std::fs::write(release.join("SHA256SUMS"), sums).unwrap();
+    release
+}
+
+#[cfg(unix)]
+#[test]
+fn a_pinned_version_is_downloaded_once_and_runs_in_this_ones_place() {
+    let dir = project("pinned", "", "twee-tools = \"9.9.9\"\n");
+    let cache = dir.join("cache");
+    let url = serve(pinnable_release(&dir, true));
+    let twee = |args: &[&str], cwd: &Path| {
+        Command::new(BIN)
+            .args(args)
+            .current_dir(cwd)
+            .env("TWEE_TOOLS_DOWNLOAD_URL", &url)
+            .env("TWEE_TOOLS_CACHE_DIR", &cache)
+            .env_remove("TWEE_TOOLS_NO_PIN")
+            .output()
+            .unwrap()
+    };
+    // The first run downloads it, and the pinned version gets the arguments as given, options it alone may know included.
+    let first = twee(&["build", "--some-future-option"], &dir);
+    assert!(first.status.success(), "{}", text(&first));
+    assert!(text(&first).contains("downloading it, once"), "{}", text(&first));
+    assert!(text(&first).contains("twee-tools 9.9.9 ran: build --some-future-option"), "{}", text(&first));
+    assert!(cache.join("9.9.9/twee-tools").is_file());
+    // Later runs use the cached copy, even with the release gone, from a folder below too.
+    std::fs::remove_dir_all(dir.join("release")).unwrap();
+    let later = twee(&["build"], &dir.join("src"));
+    assert!(text(&later).contains("twee-tools 9.9.9 ran: build") && !text(&later).contains("downloading"), "{}", text(&later));
+    // -C reaches the project from outside it.
+    let elsewhere = twee(&["-C", dir.to_str().unwrap(), "check"], &std::env::temp_dir());
+    assert!(text(&elsewhere).contains("twee-tools 9.9.9 ran: -C"), "{}", text(&elsewhere));
+    // upgrade and init are this copy's own; TWEE_TOOLS_NO_PIN runs this copy whatever the pin.
+    assert!(!text(&twee(&["upgrade", "--check"], &dir)).contains("9.9.9 ran"));
+    let own = Command::new(BIN).args(["build", "--check-only"]).current_dir(&dir).env("TWEE_TOOLS_NO_PIN", "1").output().unwrap();
+    assert!(!text(&own).contains("9.9.9 ran"), "{}", text(&own));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn a_pinned_download_that_fails_its_checksum_is_refused_and_not_kept() {
+    let dir = project("pinned-bad", "", "twee-tools = \"9.9.9\"\n");
+    let cache = dir.join("cache");
+    let url = serve(pinnable_release(&dir, false));
+    let out = Command::new(BIN)
+        .arg("build")
+        .current_dir(&dir)
+        .env("TWEE_TOOLS_DOWNLOAD_URL", &url)
+        .env("TWEE_TOOLS_CACHE_DIR", &cache)
+        .env_remove("TWEE_TOOLS_NO_PIN")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert!(text(&out).contains("doesn't match its checksum"), "{}", text(&out));
+    assert!(!cache.join("9.9.9").join("twee-tools").exists());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_pin_that_cant_work_is_refused() {
+    for (pin, says) in [("\"0.0.9\"", "can't be pinned: pin 0.1.1 or later"), ("\"soon\"", "isn't a version")] {
+        let dir = project(&format!("pin-{}", pin.trim_matches('"')), "", &format!("twee-tools = {pin}\n"));
+        let out = Command::new(BIN).arg("build").current_dir(&dir).env_remove("TWEE_TOOLS_NO_PIN").output().unwrap();
+        assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+        assert!(text(&out).contains(says), "{pin}: {}", text(&out));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+    // Pinning this very version runs this one, with nothing to download.
+    let dir = project("pin-same", "", &format!("twee-tools = \"{}\"\n", env!("CARGO_PKG_VERSION")));
+    let out = Command::new(BIN).args(["build", "--check-only"]).current_dir(&dir).env_remove("TWEE_TOOLS_NO_PIN").output().unwrap();
+    assert!(out.status.success() && !text(&out).contains("downloading"), "{}", text(&out));
+    std::fs::remove_dir_all(&dir).unwrap();
+}

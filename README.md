@@ -62,6 +62,14 @@ names the story format it's written for (`format = "SugarCube@2.37.3"` in `twee.
 and `twee-tools formats vendor` keeps that exact version in the project, so a newer twee-tools still builds the same
 page.
 
+**A version per project:** `twee-tools = "0.1.1"` in a project's `twee.toml` pins the twee-tools it builds with. Run
+any other version in that project and it downloads the pinned one, once, into a cache, checks it against the
+release's checksums, and runs it in its place with the same command, so everyone on the project, and its CI, gets the
+same build whichever twee-tools each has installed. `upgrade` and `init` aren't the project's, so they never follow
+the pin, and `TWEE_TOOLS_NO_PIN=1` runs the installed one whatever the pin says. Downloaded versions are kept in
+`~/.cache/twee-tools/versions` (`~/Library/Caches` on macOS, `%LOCALAPPDATA%` on Windows; `TWEE_TOOLS_CACHE_DIR`
+moves it). Pins start at 0.1.1, the first version that knows the key.
+
 - **Linux and macOS:**
 
   ```sh
@@ -89,8 +97,8 @@ Both scripts download the release for your system and check it against the relea
 
 **Upgrading:** `twee-tools upgrade` installs the latest release in place of the running one, checked the same way
 (`--version 0.2.0` for one particular version, `--check` to only say whether there's a newer one). If twee-tools came
-from Homebrew, Scoop or `cargo install`, it says to upgrade with those instead. twee-tools goes online only when you
-run `upgrade`.
+from Homebrew, Scoop, npm or `cargo install`, it says to upgrade with those instead. twee-tools goes online only when
+you run `upgrade`, or to download the version a project pins.
 
 ## Quick start
 
@@ -197,6 +205,7 @@ public = "public"                  # copied as it is beside the page; the defaul
 assets = ["../shared/art"]         # more folders copied beside the page, each by its name: dist/art
 format-paths = ["formats"]         # the project's own story formats, which win (default: formats/, when it's there)
 requires = "0.1"                   # the oldest twee-tools that builds this project
+twee-tools = "0.1.1"               # exactly this twee-tools: any other downloads it (once) and runs it instead
 
 [check]
 config = ["macros.twee-config.yml"]   # more checker settings, besides those beside the story
@@ -365,7 +374,8 @@ relies on: the command-line options, the `twee.toml` keys, the exit codes, the f
 **Upgrading a project:**
 
 - **A key a newer twee-tools added** stops an older one, which says so and suggests upgrading. Add
-  `requires = "0.2"` to say outright which twee-tools a project needs.
+  `requires = "0.2"` to say outright which twee-tools a project needs, or `twee-tools = "0.2.0"` to have every
+  twee-tools build it with exactly that version.
 - **A key that's renamed or retired** keeps working, with a warning saying what replaces it, for at least one minor
   version.
 - **Story formats** change built pages most of all. `format = "SugarCube@2.37.3"` asks for at least that version, as
