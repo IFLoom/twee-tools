@@ -13,6 +13,7 @@ pub use story::media;
 mod out;
 pub mod props;
 mod snowman;
+mod words;
 pub use story::markup as scan;
 pub mod sugarcube;
 
@@ -57,6 +58,8 @@ pub struct Finding {
 #[derive(Debug, Default, Serialize)]
 pub struct Stats {
     pub passages: usize,
+    /// The words a player reads: prose in passages the format doesn't run for itself, without code or markup.
+    pub words: usize,
     pub links: usize,
     pub dynamic_links: usize,
     /// Passages counted as reached only because they're numbered like one that is.
@@ -169,6 +172,7 @@ pub fn check_with(story: &Story, config: &Config, progress: Progress) -> Report 
     }
     let mut out = out::Out::default();
     out.stats.passages = story.passages.len();
+    out.stats.words = words::count(&ix);
     for part in outs {
         out.absorb(part);
     }

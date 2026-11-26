@@ -46,6 +46,7 @@ impl Out {
         self.findings.extend(other.findings);
         let (s, o) = (&mut self.stats, other.stats);
         s.passages += o.passages;
+        s.words += o.words;
         s.links += o.links;
         s.dynamic_links += o.dynamic_links;
         s.reached_by_pattern += o.reached_by_pattern;

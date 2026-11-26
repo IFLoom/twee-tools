@@ -135,13 +135,13 @@ impl Story {
         }
         match path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
             Some("html" | "htm") => {
-                let html = fs::read_to_string(path).map_err(|e| error(format!("{}: {e}", path.display())))?;
+                let (html, _) = read(path)?;
                 read_html(&html, path)
             }
             Some("twee" | "tw" | "twee2" | "tw2") => {
                 let root = path.parent().unwrap_or(Path::new(".")).to_path_buf();
                 let mut story = empty(Form::Twee, root);
-                add_twee_file(&mut story, path)?;
+                add_twee_file(&mut story, path, true)?;
                 finish_twee(story)
             }
             _ => Err(error(format!("{}: expected a .html story, a .twee file or a folder of them", path.display()))),
@@ -157,11 +157,17 @@ impl Story {
     /// `read_all`, leaving out files that match any of the globs (`src/drafts/**`, `**/*.old.twee`), as a project file
     /// excludes them.
     pub fn read_all_with(paths: &[PathBuf], exclude: &[String]) -> Result<Story, Error> {
+        Story::read_all_options(paths, exclude, true)
+    }
+
+    /// `read_all_with`, saying whether to trim each passage's text: spaces and blank lines at both ends, as Tweego trims
+    /// them (the default), or kept as written (`--no-trim`).
+    pub fn read_all_options(paths: &[PathBuf], exclude: &[String], trim: bool) -> Result<Story, Error> {
         let globs = glob_set(exclude)?;
         let exclude = (!exclude.is_empty()).then_some(&globs);
         match paths {
             [] => Err(error("Give a story: a .html file, a .twee file, or a folder of them.")),
-            [one] if one.is_dir() => read_twee_dir_with(one, exclude),
+            [one] if one.is_dir() => read_twee_dir_with(one, exclude, trim),
             [one] => Story::read(one),
             many => {
                 if let Some(html) = many.iter().find(|p| p.is_file() && !is_twee(p)) {
@@ -172,7 +178,7 @@ impl Story {
                 let mut story = empty(Form::Twee, root);
                 let mut seen = std::collections::HashSet::new();
                 for path in many {
-                    add_twee_path(&mut story, path, &mut seen, exclude)?;
+                    add_twee_path(&mut story, path, &mut seen, exclude, trim)?;
                 }
                 finish_twee(story)
             }
@@ -183,7 +189,7 @@ impl Story {
     /// for tests, and for tools that hold the text already.
     pub fn from_twee(text: &str, file: &Path) -> Result<Story, Error> {
         let mut story = empty(Form::Twee, file.parent().unwrap_or(Path::new("")).to_path_buf());
-        add_twee_text(&mut story, text, file);
+        add_twee_text(&mut story, text, file, true);
         finish_twee(story)
     }
 
@@ -360,7 +366,7 @@ pub fn read_html(html: &str, file: &Path) -> Result<Story, Error> {
         }
         let position = el.value().attr("position").map(str::to_string).filter(|v| !v.is_empty());
         let size = el.value().attr("size").map(str::to_string).filter(|v| !v.is_empty());
-        story.passages.push(Passage { name, tags, text: trim_end(&text), file: file.to_path_buf(), line, body_line: line, position, size });
+        story.passages.push(Passage { name, tags, text: text.trim_end().to_string(), file: file.to_path_buf(), line, body_line: line, position, size });
     }
     match &start_pid {
         Some(pid) if story.start.is_none() => {
@@ -401,10 +407,6 @@ fn lines_of(text: &str, needle: &str) -> Vec<usize> {
     lines
 }
 
-fn trim_end(text: &str) -> String {
-    text.trim_end().to_string()
-}
-
 // ---- Twee 3 ----
 
 fn is_twee(path: &Path) -> bool {
@@ -426,12 +428,12 @@ pub fn excluded(file: &Path, exclude: Option<&globset::GlobSet>) -> bool {
 }
 
 fn read_twee_dir(dir: &Path) -> Result<Story, Error> {
-    read_twee_dir_with(dir, None)
+    read_twee_dir_with(dir, None, true)
 }
 
-fn read_twee_dir_with(dir: &Path, exclude: Option<&globset::GlobSet>) -> Result<Story, Error> {
+fn read_twee_dir_with(dir: &Path, exclude: Option<&globset::GlobSet>, trim: bool) -> Result<Story, Error> {
     let mut story = empty(Form::Twee, dir.to_path_buf());
-    add_twee_path(&mut story, dir, &mut std::collections::HashSet::new(), exclude)?;
+    add_twee_path(&mut story, dir, &mut std::collections::HashSet::new(), exclude, trim)?;
     if !story.files.is_empty() {
         return finish_twee(story);
     }
@@ -441,7 +443,7 @@ fn read_twee_dir_with(dir: &Path, exclude: Option<&globset::GlobSet>) -> Result<
         .flatten()
         .map(|e| e.path())
         .filter(|p| p.is_file() && p.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("html") || e.eq_ignore_ascii_case("htm")))
-        .filter(|p| fs::read_to_string(p).is_ok_and(|t| t.contains("<tw-storydata")))
+        .filter(|p| read(p).is_ok_and(|(t, _)| t.contains("<tw-storydata")))
         .collect();
     published.sort();
     match published.as_slice() {
@@ -457,7 +459,13 @@ fn read_twee_dir_with(dir: &Path, exclude: Option<&globset::GlobSet>) -> Result<
 }
 
 /// Adds a Twee file, or every Twee, JavaScript and CSS file in a folder and below it, as Tweego does. Each file once.
-fn add_twee_path(story: &mut Story, path: &Path, seen: &mut std::collections::HashSet<PathBuf>, exclude: Option<&globset::GlobSet>) -> Result<(), Error> {
+fn add_twee_path(
+    story: &mut Story,
+    path: &Path,
+    seen: &mut std::collections::HashSet<PathBuf>,
+    exclude: Option<&globset::GlobSet>,
+    trim: bool,
+) -> Result<(), Error> {
     let mut files = vec![];
     if path.is_dir() {
         walk(path, &mut files).map_err(|e| error(format!("{}: {e}", path.display())))?;
@@ -477,10 +485,16 @@ fn add_twee_path(story: &mut Story, path: &Path, seen: &mut std::collections::Ha
             continue;
         }
         match ext.as_deref() {
-            Some("twee" | "tw" | "twee2" | "tw2") => add_twee_file(story, &file)?,
+            Some("twee" | "tw" | "twee2" | "tw2") => add_twee_file(story, &file, trim)?,
             // Tweego adds a folder's .js and .css to the story's script and stylesheet.
-            Some("js") => story.scripts.push(Code { name: base_name(&file), text: read(&file)?, file, line: 1 }),
-            Some("css") => story.stylesheets.push(Code { name: base_name(&file), text: read(&file)?, file, line: 1 }),
+            Some("js") => {
+                let text = read_source(story, &file)?;
+                story.scripts.push(Code { name: base_name(&file), text, file, line: 1 })
+            }
+            Some("css") => {
+                let text = read_source(story, &file)?;
+                story.stylesheets.push(Code { name: base_name(&file), text, file, line: 1 })
+            }
             _ => {}
         }
     }
@@ -530,22 +544,56 @@ fn base_name(file: &Path) -> String {
     file.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()
 }
 
-fn read(file: &Path) -> Result<String, Error> {
-    fs::read_to_string(file).map_err(|e| error(format!("{}: {e}", file.display())))
+/// A file's text: UTF-8 (less a byte-order mark, which Notepad writes), else Windows-1252, as Tweego falls back to;
+/// and whether it fell back.
+fn read(file: &Path) -> Result<(String, bool), Error> {
+    let bytes = fs::read(file).map_err(|e| error(format!("{}: {e}", file.display())))?;
+    Ok(decode(&bytes))
 }
 
-fn add_twee_file(story: &mut Story, file: &Path) -> Result<(), Error> {
-    let text = read(file)?;
+/// A source file's text, noting in the story when it wasn't UTF-8.
+fn read_source(story: &mut Story, file: &Path) -> Result<String, Error> {
+    let (text, fell_back) = read(file)?;
+    if fell_back {
+        let message = "This file isn't UTF-8, so it was read as Windows-1252 (as Tweego reads it); save it as UTF-8 to be sure";
+        story.problems.push(problem("encoding", false, message, file, 1, None));
+    }
+    Ok(text)
+}
+
+/// Bytes as text: UTF-8 without its byte-order mark, else Windows-1252; and whether it was Windows-1252.
+pub fn decode(bytes: &[u8]) -> (String, bool) {
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    match std::str::from_utf8(bytes) {
+        Ok(text) => (text.to_string(), false),
+        Err(_) => (bytes.iter().map(|&b| windows_1252(b)).collect(), true),
+    }
+}
+
+/// One Windows-1252 byte as a character: Latin-1, but for the punctuation and letters it puts in 0x80 to 0x9F.
+fn windows_1252(byte: u8) -> char {
+    const HIGH: [u32; 32] = [
+        0x20AC, 0x81, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x8D, 0x017D, 0x8F, 0x90, 0x2018, 0x2019, 0x201C,
+        0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x9D, 0x017E, 0x0178,
+    ];
+    match byte {
+        0x80..=0x9F => char::from_u32(HIGH[(byte - 0x80) as usize]).unwrap_or('\u{FFFD}'),
+        _ => byte as char,
+    }
+}
+
+fn add_twee_file(story: &mut Story, file: &Path, trim: bool) -> Result<(), Error> {
+    let text = read_source(story, file)?;
     // Twee2 writes a passage's place as `:: Name [tags] <x,y>`: Twee 3 metadata.
     let twee2 = file.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("twee2") || e.eq_ignore_ascii_case("tw2"));
     let text = if twee2 { from_twee2(&text) } else { text };
-    add_twee_text(story, &text, file);
+    add_twee_text(story, &text, file, trim);
     Ok(())
 }
 
-fn add_twee_text(story: &mut Story, text: &str, file: &Path) {
+fn add_twee_text(story: &mut Story, text: &str, file: &Path, trim: bool) {
     story.files.push(file.to_path_buf());
-    let (passages, problems) = parse_twee_checked(text, file);
+    let (passages, problems) = parse_twee_with(text, file, trim);
     story.passages.extend(passages);
     story.problems.extend(problems);
 }
@@ -557,12 +605,26 @@ pub fn parse_twee(text: &str, file: &Path) -> Vec<Passage> {
 
 /// The passages in one Twee 3 file, and what the Twee 3 spec says is wrong with their headers.
 pub fn parse_twee_checked(text: &str, file: &Path) -> (Vec<Passage>, Vec<Problem>) {
+    parse_twee_with(text, file, true)
+}
+
+/// `parse_twee_checked`, saying whether to trim each passage's text at both ends, as Tweego does unless `--no-trim`.
+pub fn parse_twee_with(text: &str, file: &Path, trim: bool) -> (Vec<Passage>, Vec<Problem>) {
+    let text = text.strip_prefix('\u{FEFF}').unwrap_or(text);
     let mut problems = vec![];
     let mut passages: Vec<Passage> = vec![];
     let mut body: Vec<&str> = vec![];
     let flush = |passages: &mut Vec<Passage>, body: &mut Vec<&str>| {
         if let Some(last) = passages.last_mut() {
-            last.text = trim_end(&body.join("\n"));
+            let joined = body.join("\n");
+            if trim {
+                // The text starts later by the blank lines trimmed from its start: its lines count from there.
+                let leading = &joined[..joined.len() - joined.trim_start().len()];
+                last.body_line += leading.matches('\n').count();
+                last.text = joined.trim().to_string();
+            } else {
+                last.text = joined;
+            }
         }
         body.clear();
     };

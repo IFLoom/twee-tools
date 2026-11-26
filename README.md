@@ -16,7 +16,7 @@ It checks published pages too, so it works for stories made in the Twine editor 
 ```
 $ twee-tools build --check-only
  hstory  Harlowe 3.3.9
- 12 passages · 12 links · 19 macros · 3 variables · 0 media files
+ 12 passages · 20 words · 12 links · 19 macros · 3 variables · 0 media files
 
  ERRORS
  ✖ Broken links · 2
@@ -119,7 +119,9 @@ else. Twee needs the project's rules (what to leave out, which fonts and media g
 | Report | everything, notes included | errors and warnings | everything, notes included |
 | Fails when | errors, or warnings with `--strict` | the same, and then it writes nothing | the same |
 
-The full reports take `--json` (a report to keep), `--errors-only` and `--all` (every entry of a long list). The page a
+The full reports take `--json` (a report to keep), `--errors-only` and `--all` (every entry of a long list). Every
+report opens with the story's counts: its passages, the words a player reads (prose, without code or markup, so not
+Tweego's count of characters over five), links, macros, variables and media files. The page a
 build writes can be checked too: `twee-tools check dist/index.html` finds what the sources' check finds.
 
 **In CI:** a Twee project runs `twee-tools build --check-only --strict`; a published page runs
@@ -132,7 +134,10 @@ build writes can be checked too: `twee-tools check dist/index.html` finds what t
   home folder or the working folder, then `TWEEGO_PATH`), and a project's own `format-paths` win over all of them. The
   format is the one `--format` or `twee.toml` names (`sugarcube`, `SugarCube@2.37.3`, `harlowe-3`), else the story's
   own, chosen as Tweego chooses: the same major version, the greatest at or above the one asked for.
-- **Sources:** `.twee`, `.tw` (and Twee2's `.twee2`, `.tw2`) files and folders of them, in name order. `.js` and `.css`
+- **Sources:** `.twee`, `.tw` (and Twee2's `.twee2`, `.tw2`) files and folders of them, in name order, read as UTF-8
+  (a byte-order mark is fine), or as Windows-1252, with a warning, when a file isn't UTF-8, as Tweego reads them. Each
+  passage is trimmed of spaces and blank lines at both ends, as Tweego trims it; `--no-trim` (or `trim = false`) keeps
+  them, for a story where they matter. `.js` and `.css`
   files become the story's JavaScript and stylesheet, and fonts become `@font-face` stylesheets. With `--embed-media`,
   images, audio, video and subtitles become Twine media passages, as Tweego always makes them; without it they stay
   files beside the page.
@@ -156,6 +161,7 @@ modules = ["modules"]              # JavaScript, CSS and fonts for the <head>, b
 exclude = ["src/drafts/**", "**/*.bak"]   # sources to leave out (also --exclude)
 embed-media = false
 strict = false                     # stop on warnings too
+trim = true                        # trim spaces and blank lines at both ends of each passage, as Tweego does (also --no-trim)
 public = "public"                  # copied as it is beside the page; the default when the folder's there
 assets = ["../shared/art"]         # more folders copied beside the page, each by its name: dist/art
 format-paths = ["formats"]         # the project's own story formats, which win over every other
@@ -292,7 +298,10 @@ change; `--keep-names` also converts images whose paths the story builds as it r
 | story formats installed by hand | built in; installed ones are still found, and a project can carry its own |
 | (no checking) | every build checks first; `--check-only` checks without building |
 | media in the sources become passages | only with `--embed-media`; otherwise they stay files beside the page |
-| `--no-trim`, `--charset`, `--log-stats`, Twine 1 output | not supported |
+| `--no-trim` | `--no-trim`, or `trim = false` |
+| `--charset` | none needed: UTF-8, with or without a byte-order mark, else Windows-1252, read without asking |
+| `--log-stats` | always in the report: passages, words, links, macros, variables and media; `--json` gives them as `stats` |
+| Twine 1 output | not supported |
 
 The story data twee-tools writes matches Tweego 2.1.1's byte for byte for the same story and format (tested on a
 110-passage project), except the attributes of `<tw-storydata>`, which follow Twine's order and name twee-tools as the

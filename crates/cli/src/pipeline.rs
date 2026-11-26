@@ -27,6 +27,8 @@ pub struct Settings {
     pub exclude: Vec<String>,
     /// Check, and stop there: write nothing.
     pub check_only: bool,
+    /// Keep each passage's text as written, not trimmed at both ends: `--no-trim`, or twee.toml's `trim = false`.
+    pub no_trim: bool,
     /// Finding codes never reported: the command line's `--ignore`, then twee.toml's `[check] ignore`.
     pub ignore: Vec<String>,
     /// Severities for codes, from twee.toml's `[check] severity`.
@@ -78,6 +80,7 @@ impl Settings {
         }
         args.embed_media |= project.embed_media.unwrap_or(false);
         args.strict |= project.strict.unwrap_or(false);
+        args.no_trim |= project.trim == Some(false);
         // The command line's patterns (relative to the working folder) and twee.toml's (relative to it), together.
         args.exclude.extend(project.exclude.iter().flatten().map(|g| project.path(Path::new(g)).to_string_lossy().into_owned()));
         // A release copy when --compress-to asks for one or twee.toml turns it on: each setting from the command line,
@@ -143,6 +146,7 @@ impl Settings {
             strict: false,
             exclude: vec![],
             check_only: false,
+            no_trim: false,
             config_files: vec![],
             ignore: vec![],
             severity: Default::default(),
@@ -215,7 +219,7 @@ pub enum Outcome {
 /// One build.
 pub fn run(settings: &Settings, progress: check::Progress) -> Outcome {
     progress(&format!("Reading {}", settings.paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ")));
-    let mut story = match Story::read_all_with(&settings.paths, &settings.exclude) {
+    let mut story = match Story::read_all_options(&settings.paths, &settings.exclude, !settings.no_trim) {
         Ok(story) => story,
         Err(error) => return Outcome::Failed(error.to_string()),
     };

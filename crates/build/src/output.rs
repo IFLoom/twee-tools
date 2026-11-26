@@ -100,7 +100,7 @@ pub fn json(story: &Story, format: &Format, options: &Options) -> Result<String,
         .passages
         .iter()
         .filter(|p| !matches!(p.name.as_str(), "StoryTitle" | "StoryData") && !p.has_tag("Twine.private"))
-        .map(|p| serde_json::json!({ "name": p.name, "tags": p.tags, "text": p.text.trim() }))
+        .map(|p| serde_json::json!({ "name": p.name, "tags": p.tags, "text": p.text }))
         .collect();
     let value = serde_json::json!({
         "name": name,
@@ -196,7 +196,7 @@ pub fn compile(story: &Story, format: &Format, options: &Options) -> Result<Page
             escape(&passage.tags.join(" ")),
             escape(&position),
             escape(&size),
-            escape(passage.text.trim())
+            escape(&passage.text)
         ));
     }
     data.push_str("</tw-storydata>");

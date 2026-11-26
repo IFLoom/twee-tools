@@ -60,6 +60,9 @@ enum Command {
         /// Relative to the working folder; twee.toml's `exclude` applies too.
         #[arg(long)]
         exclude: Vec<String>,
+        /// Keep spaces and blank lines at both ends of each passage, which are trimmed by default, as Tweego trims them.
+        #[arg(long)]
+        no_trim: bool,
         /// Write a Twine archive (the story's data alone, for Twine's library) rather than a page.
         #[arg(long, conflicts_with = "json_output")]
         archive: bool,
@@ -134,6 +137,9 @@ enum Command {
         /// Leave out source files that match a glob (repeatable); twee.toml's `exclude` applies too.
         #[arg(long)]
         exclude: Vec<String>,
+        /// Keep spaces and blank lines at both ends of each passage, which are trimmed by default, as Tweego trims them.
+        #[arg(long)]
+        no_trim: bool,
         /// More checker settings: a twee-config.yml with the story's custom macros.
         #[arg(long)]
         config: Vec<PathBuf>,
@@ -290,6 +296,7 @@ fn main() -> ExitCode {
             module,
             embed_media,
             exclude,
+            no_trim,
             archive,
             json_output,
             compress_to,
@@ -321,6 +328,7 @@ fn main() -> ExitCode {
                 strict,
                 exclude,
                 check_only,
+                no_trim,
                 config_files: config,
                 ignore,
                 severity: Default::default(),
@@ -337,7 +345,7 @@ fn main() -> ExitCode {
         }
         Command::Decompile { story, output, split } => run_decompile(story, output, split),
         Command::Init { dir, format, name } => run_init(dir, &format, name),
-        Command::Dev { paths, output, port, open, format, test, no_check, exclude, config, ignore, color } => {
+        Command::Dev { paths, output, port, open, format, test, no_check, exclude, no_trim, config, ignore, color } => {
             let settings = pipeline::Settings {
                 paths,
                 output: output.unwrap_or_default(),
@@ -353,6 +361,7 @@ fn main() -> ExitCode {
                 strict: false,
                 exclude,
                 check_only: false,
+                no_trim,
                 config_files: config,
                 ignore,
                 severity: Default::default(),

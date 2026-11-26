@@ -351,3 +351,32 @@ fn init_makes_a_public_folder() {
     assert!(!dir.join("story/dist/.gitkeep").exists(), "hidden files aren't copied");
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn passages_keep_their_ends_with_no_trim() {
+    let dir = project("no-trim", "", "");
+    std::fs::write(dir.join("src/poem.twee"), ":: Poem\n\n    Indented first line.\n").unwrap();
+    assert!(run(&dir, &["build"]).status.success());
+    let trimmed = std::fs::read_to_string(dir.join("dist/index.html")).unwrap();
+    assert!(trimmed.contains(">Indented first line.</tw-passagedata>"), "trimmed by default");
+    assert!(run(&dir, &["build", "--no-trim"]).status.success());
+    let kept = std::fs::read_to_string(dir.join("dist/index.html")).unwrap();
+    assert!(
+        kept.contains(">\n    Indented first line.\n</tw-passagedata>") || kept.contains(">\n    Indented first line.</tw-passagedata>"),
+        "kept with --no-trim"
+    );
+    std::fs::write(dir.join("twee.toml"), std::fs::read_to_string(dir.join("twee.toml")).unwrap() + "trim = false\n").unwrap();
+    assert!(run(&dir, &["build"]).status.success());
+    assert!(!std::fs::read_to_string(dir.join("dist/index.html")).unwrap().contains(">Indented first line."), "kept with trim = false");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn the_report_counts_words() {
+    let dir = project("words", "", "");
+    let out = run(&dir, &["build", "--check-only", "--json"]);
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(report["stats"]["words"].as_u64().unwrap() > 0, "{report}");
+    assert!(text(&run(&dir, &["build", "--check-only"])).contains(" words"), "the report's header says how many");
+    std::fs::remove_dir_all(&dir).unwrap();
+}

@@ -123,13 +123,14 @@ pub fn report(story: &Story, report: &Report, style: &Style, options: &Options) 
     let _ = writeln!(out, "\n {}  {}", style.bold(title), style.dim(&format));
     let mut facts = [
         format!("{} passages", s.passages),
+        format!("{} words", thousands(s.words)),
         format!("{} links", s.links),
         format!("{} macros", s.macros),
         format!("{} variables", s.variables),
         format!("{} media files", s.media_files),
     ];
     if s.dynamic_links > 0 {
-        facts[1] = format!("{} links ({} built as it runs)", s.links, s.dynamic_links);
+        facts[2] = format!("{} links ({} built as it runs)", s.links, s.dynamic_links);
     }
     let _ = writeln!(out, " {}", style.dim(&facts.join(" · ")));
     if story.form == story::Form::Twee {
@@ -343,4 +344,17 @@ fn more(out: &mut String, hidden: usize, style: &Style) {
     if hidden > 0 {
         let _ = writeln!(out, "   {}", style.dim(&format!("… and {hidden} more (--all shows every one)")));
     }
+}
+
+/// A count with commas between thousands: 12,345.
+fn thousands(n: usize) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
 }

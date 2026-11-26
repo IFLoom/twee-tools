@@ -158,6 +158,44 @@ pub(crate) fn read(text: &str) -> Passage {
     out
 }
 
+/// The text of a passage a player can read: after the vars section, without modifier lines, the sections under
+/// `[JavaScript]`, `[CSS]` and note modifiers, or inserts. Kept the same length (what's dropped becomes spaces), so
+/// offsets still line up.
+pub(crate) fn prose(text: &str) -> String {
+    let mut out: Vec<u8> = text.bytes().map(|b| if b == b'\n' { b'\n' } else { b' ' }).collect();
+    let mut sets = vec![];
+    let mut frame = vec![];
+    let body_start = vars_section(text, &mut sets, &mut frame);
+    let mut hidden = false;
+    let mut at = body_start;
+    for line in text[body_start..].split_inclusive('\n') {
+        let whole = line.trim_end_matches(['\n', '\r']);
+        let modifier = whole.strip_prefix('[').and_then(|t| t.strip_suffix(']')).filter(|i| i.chars().count() >= 3 && !i.starts_with('[') && !i.ends_with(']'));
+        if let Some(inner) = modifier {
+            hidden = inner.split(';').any(|m| {
+                let m = m.trim().to_ascii_lowercase();
+                m == "javascript"
+                    || m == "css"
+                    || (is_modifier(&m) && (m.starts_with("note") || m.starts_with("n.") || m == "nb" || m == "todo" || m == "fixme"))
+            });
+        } else if !hidden {
+            out[at..at + line.len()].copy_from_slice(line.as_bytes());
+            // Inserts show something else, or nothing: never the words written in them.
+            let bytes = line.as_bytes();
+            let mut from = 0;
+            while let Some(open) = line[from..].find('{').map(|i| from + i) {
+                let Some(close) = closing_brace(bytes, open) else { break };
+                for b in &mut out[at + open..=at + close] {
+                    *b = b' ';
+                }
+                from = close + 1;
+            }
+        }
+        at += line.len();
+    }
+    String::from_utf8(out).unwrap_or_default()
+}
+
 /// The vars section, read as Chapbook's own code reads it: everything before the first line that is exactly `--`.
 /// Each line with a colon sets the name before it (less a `(condition)`); a line without one, such as a `//` comment,
 /// Chapbook ignores. Its variables go into `sets`, the header and footer it sets into `frame`; gives where the text

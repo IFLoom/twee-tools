@@ -86,6 +86,9 @@ pub fn notes(story: &Story) -> Vec<String> {
         } else if p.text.lines().any(|l| l.starts_with("::")) {
             out.push(format!("\"{}\" has a line starting with ::, which Twee reads as a new passage", p.name));
         }
+        if p.text.trim_start() != p.text {
+            out.push(format!("\"{}\" starts with spaces or blank lines, which a build trims: build with --no-trim (or trim = false) to keep them", p.name));
+        }
         if p.name.trim() != p.name || p.name.is_empty() {
             out.push(format!("\"{}\" starts or ends with a space, which Twee drops", p.name));
         }

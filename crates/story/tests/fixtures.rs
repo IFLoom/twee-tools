@@ -150,3 +150,28 @@ fn versions_and_skipped_folders() {
     assert!(story::skipped_folder(".git") && story::skipped_folder("node_modules") && story::skipped_folder("target"));
     assert!(!story::skipped_folder("media") && story::passed_by(".DS_Store") && !story::passed_by("story.twee"));
 }
+
+#[test]
+fn a_byte_order_mark_and_windows_1252_are_read() {
+    let dir = std::env::temp_dir().join(format!("twee-tools-encodings-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("bom.twee"), b"\xEF\xBB\xBF:: StoryTitle\nWith a mark\n\n:: Start\nHi.\n").unwrap();
+    let story = story::Story::read(&dir.join("bom.twee")).unwrap();
+    assert_eq!(story.title.as_deref(), Some("With a mark"), "the mark isn't part of the first header");
+    std::fs::write(dir.join("old.twee"), b":: Start\nCaf\xe9 \x93quoted\x94 \x80 5\n").unwrap();
+    let story = story::Story::read(&dir.join("old.twee")).unwrap();
+    assert_eq!(story.passage("Start").unwrap().text, "Caf\u{e9} \u{201c}quoted\u{201d} \u{20ac} 5");
+    assert!(story.problems.iter().any(|p| p.kind == "encoding"), "{:?}", story.problems);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn passages_are_trimmed_at_both_ends_and_lines_still_count_from_the_file() {
+    let text = ":: Start\n\n\n  Hello.\n\n:: Next\nThere.\n";
+    let (passages, _) = story::parse_twee_with(text, std::path::Path::new("x.twee"), true);
+    assert_eq!(passages[0].text, "Hello.");
+    assert_eq!(passages[0].line_at(0), 4, "the text starts on line 4, where Hello is");
+    let (kept, _) = story::parse_twee_with(text, std::path::Path::new("x.twee"), false);
+    assert_eq!(kept[0].text, "\n\n  Hello.\n");
+}
