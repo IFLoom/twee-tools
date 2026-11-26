@@ -1,5 +1,9 @@
 # twee-tools
 
+[![CI](https://github.com/IFLoom/twee-tools/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/IFLoom/twee-tools/actions/workflows/ci.yml)
+[![Release](https://github.com/IFLoom/twee-tools/actions/workflows/release.yml/badge.svg)](https://github.com/IFLoom/twee-tools/releases/latest)
+[![Licence: MIT or Apache-2.0](https://img.shields.io/badge/licence-MIT%20or%20Apache--2.0-blue)](#licences)
+
 A Twee compiler, story checker and media compressor for [Twine](https://twinery.org) stories, in one program.
 
 - **Build** Twee into a page to play, as [Tweego](https://www.motoslave.net/tweego/) does, with SugarCube, Harlowe,
@@ -11,7 +15,8 @@ A Twee compiler, story checker and media compressor for [Twine](https://twinery.
 
 It checks published pages too, so it works for stories made in the Twine editor as well as Twee projects.
 
-> twee-tools is pre-release: it isn't published yet, and its options may still change.
+> twee-tools is at 0.1: before 1.0, a minor version may still change its options (see [Versioning](#versioning)).
+> Its page is [ifloom.dev/twee-tools](https://ifloom.dev/twee-tools).
 
 ```
 $ twee-tools build --check-only
