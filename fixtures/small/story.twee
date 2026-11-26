@@ -1,0 +1,33 @@
+:: StoryTitle
+The Bakery
+
+:: StoryData
+{
+  "ifid": "D674C58C-DEFA-4F70-B7A2-27742230C0FC",
+  "format": "SugarCube",
+  "format-version": "2.37.3",
+  "start": "Street"
+}
+
+:: StoryInit
+<<set $coins to 2>>
+
+:: Street [outside]
+You stand outside a bakery. [img[media/shop.png]]
+[[Go in|Bakery]]
+
+:: Bakery
+<<if $coins gte 3>>The baker slides a warm loaf across the counter.
+[[Buy the loaf|Home][$coins -= 3; $bread to true]]
+<<else>>"Three coins," the baker says. You count <<print $coins>>.<</if>>
+[[Leave|Street]]
+
+:: Home [inside]
+<img src="media/home.jpg" alt="Your kitchen">
+<<if $bread>>You eat the bread & smile.<</if>>
+
+:: Story Stylesheet [stylesheet]
+body { background: url("media/paper.png"); }
+
+:: Story JavaScript [script]
+setup.price = 3;

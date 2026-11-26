@@ -1,0 +1,123 @@
+:: StoryTitle
+The Seeded House
+
+:: StoryData
+{ "ifid": "0C3B4B0E-6A33-4F0A-9E0A-6F1B5E2D7A11", "format": "SugarCube", "format-version": "2.37.3", "start": "Hall" }
+
+:: StoryInit
+<<set $coins to 2>> // the coins to start with
+<<set $unused to 1>>
+<<set $next to "Cellar">>
+<<set $room to "a">>
+<<set $office to { reputation: 0, staff: { count: 2 } }>>
+
+:: Hall
+<img src="media/hall.jpg"> [img[media/Shop.PNG]]
+<<if $coins gt 1>>You have money.<<else>>You don't.<<endif>>
+[[Kitchen]] [[Go|Nowhere]] [[Down|$next]] [[Garden]] <<wardrobe "Ear">>
+/* [[Commented|Ghost passage]] */
+<<goto "Study">>
+<<shout "hi">>
+<<greet "Ava">>
+<<if $ghost>>Boo.<</if>>
+<<print $fromJs>> <<set _label to "receipt.png">> <video src="media/clips/<<print $coins>>.webm"></video>
+<img @src="'media/rooms/' + $room + '.gif'">
+<<set $where to "Library">><<link "Read" $where>><</link>>
+
+:: Kitchen
+An earlier kitchen, replaced by the one below. [[Back|Hall]]
+
+:: Kitchen
+The kitchen that plays. [[Back|Hall]]
+<<else>>
+<<if $coins gt 5>>Rich.
+<img src="media/gone.png">
+
+:: Cellar
+[[Up|Hall]] <<if $coins gt 1 or if $coins lt 0>>Odd.<</if>>
+<</for>>
+<<shine>>Glow<</shine>>
+
+:: Study
+[[Back|Hall]] <<print $office.staff.count>> <<if $office.reputaton gt 1>>Known.<</if>>
+<<for _i to 0; _i lt 3; _i++>><<if _i is 1>><<continue>><</if>><</for>>
+
+:: Library [NOBR]
+Quiet. [[Shelf1]] [[Notes]] [[Odd]] [[Workshop]] <<link "Across" "Left|Right">><</link>>
+<<include "Counting">> <<if $coins is not 3>>Not three.<</if>> <<silently>>hush<</silently>>
+<<set _n to tally(2)>>
+[[Broken link
+<<print "unfinished"
+
+:: Shelf1
+Books. [[Back|Library]]
+
+:: Shelf2
+More books. [[Shelf2 back|Library]]
+
+:: Attic [dusty dusty]
+Dusty.
+
+:: Widgets [widget]
+<<widget "greet">>Hello, _args[0] and $args[0].<</widget>>
+
+:: Story JavaScript [script]
+State.variables.fromJs = 1;
+Config.passages.strat = "Hall";
+setup.note = '<img class="note" src="media/rooms/../shop.png" alt="">';
+setup.photo = '<img src="media/hall.jpg">';
+setup.room = function (n) { return '<img src="media/rooms/' + n + '.gif">'; };
+Macro.add("shine", { tags: null, handler() {} });
+
+:: Porch
+A porch. [[In|Hall]]
+
+:: Garden
+<a onclick="SugarCube.Engine.play('Porch')">Out</a>
+
+:: Piercing
+The parlour. [[Out|Hall]]
+
+:: Piercing Nose
+A stud. [[Out|Hall]]
+
+:: Piercing Ear
+A ring.
+
+:: Wardrobe [widget]
+<<widget "wardrobe">><<link "Pierce">><<run Engine.play("Piercing" + " " + _args[0])>><<goto "Piercing">><</link>><<run var sv = State.variables; sv.dressed = true>><<if $dressed>>Dressed.<</if>><</widget>>
+<<widget "spare">>Nothing.<</widget>>
+
+:: Notes
+Double-click this passage to edit it.
+
+:: Counting [widget]
+<<widget "tally">>Counted _args[0].<</widget>>
+<<widget "link">>Mine.<</widget>>
+
+   :: Not A Header
+Indented, so it's text of the passage above.
+
+:: Odd [meta] {"position":"10"}
+Odd metadata. [[Back|Hall]]
+
+:: Left|Right
+Unreachable by links. [[Back|Hall]]
+
+:: Workshop
+<<if $coins = 3>>Three.<</if>>
+<<textbox $coins "2">>
+<<link "Go", "Hall">><</link>>
+<<switch $coins>><<default>>Any.<<case 1>>One.<</switch>>
+<<set $1st to 1>>
+You have $coins.toFixed(2) coins.
+<<if def $coins and $coins gt 1>>Some.<</if>>
+<<for _i to 0; _i lt 2; _i++>><<link "Pick">><<set $coins to _i>><</link>><</for>>
+<<audio "theme" play>>
+[[Docs|https://example.com][$coins to 1]]
+[[Try|Hall][$coins to (]]
+(set: $coins to 1)
+<<back "Back" "Nowhere2">>
+<<return $coins>>
+<<link "Leave">><<goto "Hall">><<set $coins to 0>><</link>>
+<img src="C:\Users\me\Pictures\shop.png">

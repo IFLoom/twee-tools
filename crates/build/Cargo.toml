@@ -1,0 +1,21 @@
+[package]
+name = "build"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+story = { path = "../story" }
+oxc_parser = "0.160"
+oxc_allocator = "0.160"
+oxc_span = "0.160"
+oxc_ast = "0.160"
+getrandom = "0.3"
+base64 = "0.22"
+serde_json = "1"
+
+[dev-dependencies]
+serde_json = "1"
+story = { path = "../story" }

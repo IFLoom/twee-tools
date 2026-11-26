@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html><head><title>The Bakery</title></head><body>
+<tw-storydata name="The Bakery" startnode="2" creator="hand" creator-version="1" format="SugarCube" format-version="2.37.3" ifid="D674C58C-DEFA-4F70-B7A2-27742230C0FC" options="" tags="" zoom="1" hidden><style role="stylesheet" id="twine-user-stylesheet" type="text/twine-css">body { background: url("media/paper.png"); }</style><script role="script" id="twine-user-script" type="text/twine-javascript">setup.price = 3;</script><tw-passagedata pid="1" name="StoryInit" tags="" position="100,100" size="100,100">&lt;&lt;set $coins to 2&gt;&gt;</tw-passagedata>
+<tw-passagedata pid="2" name="Street" tags="outside" position="200,100" size="100,100">You stand outside a bakery. [img[media/shop.png]]
+[[Go in|Bakery]]</tw-passagedata>
+<tw-passagedata pid="3" name="Bakery" tags="" position="300,100" size="100,100">&lt;&lt;if $coins gte 3&gt;&gt;The baker slides a warm loaf across the counter.
+[[Buy the loaf|Home][$coins -= 3; $bread to true]]
+&lt;&lt;else&gt;&gt;"Three coins," the baker says. You count &lt;&lt;print $coins&gt;&gt;.&lt;&lt;/if&gt;&gt;
+[[Leave|Street]]</tw-passagedata>
+<tw-passagedata pid="4" name="Home" tags="inside" position="400,100" size="100,100">&lt;img src="media/home.jpg" alt="Your kitchen"&gt;
+&lt;&lt;if $bread&gt;&gt;You eat the bread &amp; smile.&lt;&lt;/if&gt;&gt;</tw-passagedata></tw-storydata>
+</body></html>
