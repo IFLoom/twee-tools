@@ -6,6 +6,8 @@ Each change goes under **Unreleased** as it's made; `scripts/release.sh` turns t
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-26
+
 The first release.
 
 ### Added
